@@ -1,0 +1,362 @@
+---
+title: "Ejemplo: Medición Confiable con Indicadores Binarios"
+author: "Tu Nombre"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(lavaan)
+library(semTools)
+library(ggplot2)
+library(dplyr)
+```
+
+## 1. Simulación de Indicadores Binarios con Alta Confiabilidad
+
+Simulamos una variable latente (por ejemplo, pobreza) y seis indicadores binarios con una relación muy fuerte con esta.
+
+```{r}
+set.seed(123)
+N <- 2000
+eta <- rnorm(N)  # variable latente
+
+inv_logit <- function(x) {
+  exp(x) / (1 + exp(x))
+}
+
+# Queremos varianza explicada (R²) ≈ 0.95 → alta relación pero sin saturar
+# Para eso usamos una función logística con moderadas pendientes (e.g., 3.5)
+beta <- rep(3.5, 6)  # log-odds scaling (relación con la latente)
+intercepts <- rep(0, 6)  # punto medio = 0 (simetría)
+
+# Probabilidades para cada ítem
+logit_probs <- sapply(1:6, function(j) {
+  inv_logit(beta[j] * eta + intercepts[j])
+})
+
+# Simulamos ítems binarios
+items <- as.data.frame(sapply(1:6, function(j) {
+  rbinom(N, size = 1, prob = logit_probs[, j])
+}))
+
+colnames(items) <- paste0("item", 1:6)
+```
+
+## 2. Modelo de Medición: CFA con Variables Categóricas
+
+```{r}
+modelo <- '
+  factor =~ item1 + item2 + item3 + item4 + item5 + item6
+'
+
+ajuste <- cfa(modelo, data = items, ordered = names(items), estimator = "WLSMV")
+```
+
+## 3. Coeficiente de Determinación R²
+
+```{r}
+r2 <- inspect(ajuste, "r2")
+r2_df <- data.frame(item = names(r2), R2 = as.numeric(r2))
+
+ggplot(r2_df, aes(x = reorder(item, R2), y = R2)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  ylim(0, 1) +
+  labs(title = expression(R^2 ~ "de cada indicador binario"),
+       x = "Indicador", y = expression(R^2)) +
+  theme_minimal(base_size = 14)
+```
+
+## 4. Evaluación Global del Modelo
+
+```{r}
+fitMeasures(ajuste, c("cfi.robust", "tli.robust", 
+                      "rmsea.robust", 
+                      "rmsea.ci.lower.robust", "rmsea.ci.upper.robust"))
+```
+
+Esperamos valores de **CFI y TLI > 0.95** y **RMSEA < 0.05**, indicando ajuste excelente.
+
+## 5. Comparación: Puntaje Simple vs. Puntaje Latente
+
+```{r}
+puntajes <- lavPredict(ajuste, method = "regression")
+
+datos <- items %>%
+  mutate(suma_simple = rowSums(.),
+         puntaje_latente = puntajes[,1])
+
+ggplot(datos, aes(x = suma_simple, y = puntaje_latente)) +
+  geom_jitter(width = 0.2, alpha = 0.3, color = "steelblue") +
+  geom_smooth(method = "loess", se = FALSE, color = "red") +
+  labs(title = "Puntaje Latente vs. Suma Simple",
+       x = "Suma de Indicadores", y = "Puntaje Latente") +
+  theme_minimal()
+
+cor(datos$suma_simple, datos$puntaje_latente)
+```
+
+## 6. Confiabilidad: Coeficiente Omega
+
+```{r}
+compRelSEM(ajuste)
+```
+
+Se espera un **omega total cercano a 0.95 o más**, lo que indica excelente confiabilidad del conjunto de indicadores.
+
+## Error aleatorio
+
+
+## Anexo: Simulación de indicadores con baja calidad de medición
+
+En esta sección, agregamos tres indicadores binarios adicionales con **muy baja relación con la variable latente**, es decir, \( R^2 < 0.10 \). Esto permite contrastar un buen y un mal diseño de medición.
+
+```{r}
+# Simulación de ítems poco relacionados con la latente (bajas cargas)
+# Usamos pendientes pequeñas (e.g., 0.5) para lograr R2 bajos
+
+beta_bajo <- rep(0.5, 3)
+intercepts_bajo <- rep(0, 3)  # punto medio
+
+# Calculamos probabilidades
+logit_probs_bajo <- sapply(1:3, function(j) {
+  inv_logit(beta_bajo[j] * eta + intercepts_bajo[j])
+})
+
+# Simulamos ítems binarios poco informativos
+items_bajo <- as.data.frame(sapply(1:3, function(j) {
+  rbinom(N, size = 1, prob = logit_probs_bajo[, j])
+}))
+
+colnames(items_bajo) <- paste0("item", 7:9)
+
+# Unimos con la base de datos original
+items <- bind_cols(items, items_bajo)
+```
+
+Ahora la base `items` tiene 9 indicadores:
+
+- `item1` a `item6`: indicadores bien relacionados con la latente (\( R^2 \approx 0.95 \)),
+- `item7` a `item9`: indicadores mal relacionados con la latente (\( R^2 < 0.10 \)).
+
+Esto nos permitirá analizar el impacto de **medición deficiente** sobre los puntajes, confiabilidad y ajuste del modelo.
+
+## CFA con mezcla de buenos y malos indicadores
+
+En esta sección ajustamos un modelo de medición con una combinación de tres buenos indicadores (`item1`, `item2`, `item3`) y tres malos (`item7`, `item8`, `item9`). Esto permite evaluar qué sucede cuando el instrumento contiene ítems poco informativos.
+
+```{r}
+# Modelo de 6 indicadores: 3 buenos (altos R2), 3 malos (bajos R2)
+modelo_mixto <- '
+  factor =~ item1 + item2 + item3 + item7 + item8 + item9
+'
+
+ajuste_mixto <- cfa(modelo_mixto, data = items, ordered = c("item1", "item2", "item3", "item7", "item8", "item9"),
+                    estimator = "WLSMV")
+```
+
+### R² de los indicadores en el modelo mixto
+
+```{r}
+r2_mixto <- inspect(ajuste_mixto, "r2")
+r2_df_mixto <- data.frame(item = names(r2_mixto), R2 = as.numeric(r2_mixto))
+
+ggplot(r2_df_mixto, aes(x = reorder(item, R2), y = R2)) +
+  geom_col(fill = "tomato") +
+  coord_flip() +
+  ylim(0, 1) +
+  labs(title = expression(R^2 ~ "en modelo con indicadores mixtos"),
+       x = "Indicador", y = expression(R^2)) +
+  theme_minimal(base_size = 14)
+```
+
+### Comparación entre puntaje latente y suma simple observada
+
+```{r}
+# Puntajes latentes del modelo
+puntajes_mixtos <- lavPredict(ajuste_mixto, method = "regression")
+
+# Suma simple de los 6 ítems (3 buenos + 3 malos)
+datos_mixtos <- items %>%
+  mutate(suma_simple_mixta = rowSums(select(., item1, item2, item3, item7, item8, item9)),
+         puntaje_latente_mixto = puntajes_mixtos[,1])
+
+# Gráfica de comparación
+ggplot(datos_mixtos, aes(x = suma_simple_mixta, y = puntaje_latente_mixto)) +
+  geom_jitter(width = 0.2, alpha = 0.3, color = "darkred") +
+  geom_smooth(method = "loess", se = FALSE, color = "black") +
+  labs(title = "Puntaje Latente vs. Suma Simple (Indicadores Mixtos)",
+       x = "Suma de Indicadores", y = "Puntaje Latente") +
+  theme_minimal()
+
+# Correlación
+cor(datos_mixtos$suma_simple_mixta, datos_mixtos$puntaje_latente_mixto)
+```
+
+### Confiabilidad del modelo (Omega)
+
+```{r}
+compRelSEM(ajuste_mixto)
+```
+
+Esperamos que la **confiabilidad disminuya** y que la **correlación entre el puntaje simple y el latente se debilite**, comparado con el modelo original que usaba sólo buenos indicadores. Esto ilustra el efecto negativo de incluir ítems con bajo poder de medición.
+
+## Modelo logit ordinal (ologit) con predictores latentes
+
+En esta sección simulamos dos predictores fuertemente correlacionados con la variable latente y los usamos para predecir los puntajes observados de dos combinaciones distintas de indicadores.
+
+```{r}
+# Simulamos predictores altamente correlacionados con la variable latente
+# eta ya existe de antes (variable latente base)
+set.seed(456)
+ingreso <- scale(eta + rnorm(length(eta), 0, 5.5))  # alta correlación con eta
+educacion <- scale(eta + rnorm(length(eta), 0, .75))  # otro predictor latente
+
+# Agregamos predictores al dataframe
+datos_predictivos <- items %>%
+  mutate(
+    ingreso = ingreso,
+    educacion = educacion,
+    
+    # Suma observada buena (ítems 1 a 6)
+    score_bueno = rowSums(select(., item1:item6)),
+
+    # Suma observada mixta (ítems 1-3 + 7-9)
+    score_mixto = rowSums(select(., item1, item2, item3, item7, item8, item9))
+  )
+```
+
+### Estimamos modelos logit ordinal
+
+```{r}
+library(MASS)  # para polr()
+
+# score_bueno como variable dependiente ordinal
+modelo_bueno <- polr(factor(score_bueno, ordered = TRUE) ~ ingreso + educacion,
+                     data = datos_predictivos, Hess = TRUE)
+
+summary(modelo_bueno)
+```
+
+```{r}
+# score_mixto como variable dependiente ordinal
+modelo_mixto <- polr(factor(score_mixto, ordered = TRUE) ~ ingreso + educacion,
+                     data = datos_predictivos, Hess = TRUE)
+
+summary(modelo_mixto)
+```
+
+### Interpretación esperada
+
+- El **modelo con score_bueno** debe tener **coeficientes más grandes y significativos**, ya que la variable dependiente (score observado) representa mejor la latente.
+- El **modelo mixto** mostrará coeficientes más pequeños y menos precisos, ilustrando cómo **mala medición reduce la validez predictiva**.
+
+Opcionalmente se pueden comparar pseudo-\( R^2 \), errores estándar, o visualizar predicciones.
+
+## Comparación gráfica de coeficientes: score bueno vs score mixto
+
+```{r}
+# Extraemos coeficientes e intervalos de confianza para ambos modelos
+coef_bueno <- summary(modelo_bueno)$coefficients
+ci_bueno <- confint(modelo_bueno)
+
+coef_mixto <- summary(modelo_mixto)$coefficients
+ci_mixto <- confint(modelo_mixto)
+
+# Empaquetamos en data frames
+coef_plot <- rbind(
+  data.frame(modelo = "Score Bueno", 
+             predictor = rownames(coef_bueno),
+             estimate = coef_bueno[, 1],
+             lwr = ci_bueno[, 1],
+             upr = ci_bueno[, 2]),
+  data.frame(modelo = "Score Mixto", 
+             predictor = rownames(coef_mixto),
+             estimate = coef_mixto[, 1],
+             lwr = ci_mixto[, 1],
+             upr = ci_mixto[, 2])
+)
+
+# Solo nos quedamos con los predictores (no interceptos)
+coef_plot <- coef_plot %>%
+  filter(predictor %in% c("ingreso", "educacion"))
+```
+
+```{r}
+# Gráfica de comparación
+ggplot(coef_plot, aes(x = predictor, y = estimate, color = modelo)) +
+  geom_point(position = position_dodge(width = 0.4), size = 3) +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.2, 
+                position = position_dodge(width = 0.4)) +
+  labs(title = "Coeficientes e intervalos de confianza",
+       y = "Estimación", x = "Predictores") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray30") +
+  theme_minimal(base_size = 14)
+```
+
+### Interpretación
+
+- Un mayor valor de los coeficientes indica mayor asociación con la variable dependiente.
+- Los intervalos de confianza más estrechos en el modelo `Score Bueno` indican mayor precisión.
+- Si los IC del modelo `Score Mixto` tocan el 0, sugiere que los errores de medición están ocultando relaciones reales.
+
+## Comparación de clasificación: punto de corte de 1 privación
+
+Identificamos como “pobres” a quienes tienen **una o más privaciones**. Comparamos la clasificación de pobreza entre el score bueno y el score mixto.
+
+```{r}
+# Crear variables binarias de pobreza
+datos_predictivos <- datos_predictivos %>%
+  mutate(
+    pobre_bueno = ifelse(score_bueno >= 1, 1, 0),
+    pobre_mixto = ifelse(score_mixto >= 1, 1, 0)
+  )
+```
+
+### Tabla de contingencia
+
+```{r}
+table_clasificacion <- table(Pobre_Score_Bueno = datos_predictivos$pobre_bueno,
+                             Pobre_Score_Mixto = datos_predictivos$pobre_mixto)
+
+table_clasificacion
+```
+
+### Medida de acuerdo
+
+```{r}
+library(caret)
+confusionMatrix(factor(datos_predictivos$pobre_mixto),
+                factor(datos_predictivos$pobre_bueno),
+                positive = "1")
+```
+
+Esto proporciona:
+
+- **Exactitud global**,
+- **Sensibilidad / especificidad** del score mixto respecto al score bueno,
+- **Índice kappa** de acuerdo.
+
+---
+
+### Visualización de la discordancia
+
+```{r}
+ggplot(datos_predictivos, aes(x = factor(pobre_bueno), fill = factor(pobre_mixto))) +
+  geom_bar(position = "fill") +
+  labs(title = "Comparación de clasificación de pobreza",
+       x = "Pobre según Score Bueno",
+       y = "Proporción (según Score Mixto)",
+       fill = "Pobre (Score Mixto)") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal(base_size = 14)
+```
+
+### Interpretación
+
+- Las discrepancias muestran cómo la **mala medición genera errores de clasificación**.
+- Un score con ítems mal diseñados puede **subestimar o sobreestimar** la pobreza.
+
+

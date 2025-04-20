@@ -1,0 +1,160 @@
+---
+title: "Clase 11 B"
+author: "Hector Najera"
+date: "2025-04-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(lavaan)
+library(semTools)
+library(ggplot2)
+library(dplyr)
+```
+
+
+## Intercambiabilidad de indicadores con propiedades estadísticas equivalentes
+
+En este ejercicio mostramos que si los indicadores tienen **cargas, varianzas y distribución equivalentes**, entonces su **reemplazo no altera la medición**.
+
+```{r}
+set.seed(2025)
+
+# Variable latente
+N <- 2000
+eta <- rnorm(N)
+
+# Carga común para todos los ítems
+beta <- 3.0
+inv_logit <- function(x) exp(x) / (1 + exp(x))
+
+# Simulamos 6 indicadores originales (Escala A)
+probs_a <- sapply(1:6, function(j) inv_logit(beta * eta))
+items_a <- as.data.frame(sapply(1:6, function(j) rbinom(N, 1, probs_a[, j])))
+colnames(items_a) <- paste0("item", 1:6)
+
+# Simulamos 3 indicadores alternativos con propiedades idénticas (Escala B)
+probs_b <- sapply(1:3, function(j) inv_logit(beta * eta))
+items_b_alt <- as.data.frame(sapply(1:3, function(j) rbinom(N, 1, probs_b[, j])))
+colnames(items_b_alt) <- paste0("item", 10:12)
+
+# Unimos las dos versiones
+items_full <- bind_cols(items_a, items_b_alt)
+
+# Construimos dos escalas
+escala_a <- rowSums(select(items_full, item1:item6))
+escala_b <- rowSums(bind_cols(select(items_full, item1:item3), select(items_full, item10:item12)))
+```
+
+---
+
+### Confiabilidad omega de ambas escalas
+
+```{r}
+library(lavaan)
+library(semTools)
+
+# CFA para escala A
+modelo_a <- 'f =~ item1 + item2 + item3 + item4 + item5 + item6'
+ajuste_a <- cfa(modelo_a, data = items_full, ordered = paste0("item", 1:6), estimator = "WLSMV")
+
+# CFA para escala B
+modelo_b <- 'f =~ item1 + item2 + item3 + item10 + item11 + item12'
+ajuste_b <- cfa(modelo_b, data = items_full, ordered = c("item1", "item2", "item3", "item10", "item11", "item12"), estimator = "WLSMV")
+
+# Confiabilidades
+reliability(ajuste_a)
+reliability(ajuste_b)
+```
+
+---
+
+### Comparación de clasificación con corte de 3 privaciones
+
+```{r}
+table(data.frame(
+  pobre_a = escala_a >= 3,
+  pobre_b = escala_b >= 3
+))
+```
+
+---
+
+### Comparación de regresión con predictores latentes
+
+```{r}
+# Simulamos predictores correlacionados con eta
+x1 <- scale(eta + rnorm(N, 0, 0.3))
+x2 <- scale(eta + rnorm(N, 0, 0.3))
+
+# Regressión: escala A
+summary(lm(escala_a ~ x1 + x2))
+
+# Regressión: escala B
+summary(lm(escala_b ~ x1 + x2))
+```
+
+## Comparación gráfica de regresiones: Escala A vs Escala B
+
+Graficamos los coeficientes de regresión de ambas escalas como variable dependiente, con predictores `x1` y `x2`.
+
+```{r}
+# Ajustamos modelos lineales
+reg_a <- lm(escala_a ~ x1 + x2)
+reg_b <- lm(escala_b ~ x1 + x2)
+
+# Extraemos coeficientes e intervalos de confianza
+coef_a <- summary(reg_a)$coefficients
+ci_a <- confint(reg_a)
+
+coef_b <- summary(reg_b)$coefficients
+ci_b <- confint(reg_b)
+
+# Empaquetamos en data frame para graficar
+coef_plot <- rbind(
+  data.frame(modelo = "Escala A",
+             predictor = rownames(coef_a)[-1],  # quitamos intercepto
+             estimate = coef_a[-1, 1],
+             lwr = ci_a[-1, 1],
+             upr = ci_a[-1, 2]),
+  data.frame(modelo = "Escala B",
+             predictor = rownames(coef_b)[-1],
+             estimate = coef_b[-1, 1],
+             lwr = ci_b[-1, 1],
+             upr = ci_b[-1, 2])
+)
+```
+
+```{r}
+# Gráfico de comparación de coeficientes
+library(ggplot2)
+
+ggplot(coef_plot, aes(x = predictor, y = estimate, color = modelo)) +
+  geom_point(position = position_dodge(width = 0.4), size = 3) +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.2, 
+                position = position_dodge(width = 0.4)) +
+  labs(title = "Comparación de coeficientes de regresión",
+       x = "Predictor", y = "Estimación (Beta)") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray30") +
+  theme_minimal(base_size = 14)
+```
+
+### Interpretación
+
+La **superposición casi exacta** de los coeficientes e intervalos confirma que las escalas construidas con indicadores estadísticamente equivalentes producen estimaciones equivalentes. Esto ilustra el principio de **invariancia estadística bajo intercambiabilidad** en modelos reflectivos.
+
+
+
+---
+
+### Conclusión
+
+Ambas escalas producen:
+
+- Mismas tasas de clasificación por punto de corte,
+- Mismos coeficientes de regresión,
+- Mismo nivel de confiabilidad.
+
+Esto demuestra que **lo importante en la medición es el modelo estadístico**, no los indicadores particulares — si estos cumplen con las mismas propiedades (carga, varianza, independencia condicional).
+
