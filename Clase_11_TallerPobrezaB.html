@@ -404,36 +404,12 @@ modelo_b &lt;- &#39;f =~ item1 + item2 + item3 + item10 + item11 + item12&#39;
 ajuste_b &lt;- cfa(modelo_b, data = items_full, ordered = c(&quot;item1&quot;, &quot;item2&quot;, &quot;item3&quot;, &quot;item10&quot;, &quot;item11&quot;, &quot;item12&quot;), estimator = &quot;WLSMV&quot;)
 
 # Confiabilidades
-reliability(ajuste_a)</code></pre>
-<pre><code>## Warning in reliability(ajuste_a): 
-## The reliability() function was deprecated in 2022 and will cease to be included in future versions of semTools. See help(&#39;semTools-deprecated) for details.
-## 
-## It is replaced by the compRelSEM() function, which can estimate alpha and model-based reliability in an even wider variety of models and data types, with greater control in specifying the desired type of reliability coefficient (i.e., more explicitly choosing assumptions). 
-## 
-## The average variance extracted should never have been included because it is not a reliability coefficient. It is now available from the AVE() function.</code></pre>
-<pre><code>## For constructs with categorical indicators, Zumbo et al.`s (2007) &quot;ordinal alpha&quot; is calculated in addition to the standard alpha, which treats ordinal variables as numeric. See Chalmers (2018) for a critique of &quot;alpha.ord&quot; and the response by Zumbo &amp; Kroc (2019). Likewise, average variance extracted is calculated from polychoric (polyserial) not Pearson correlations.</code></pre>
-<pre><code>##                   f
-## alpha     0.8687869
-## alpha.ord 0.9429898
-## omega     0.8690163
-## omega2    0.8690163
-## omega3    0.8693449
-## avevar    0.7343317</code></pre>
-<pre class="r"><code>reliability(ajuste_b)</code></pre>
-<pre><code>## Warning in reliability(ajuste_b): 
-## The reliability() function was deprecated in 2022 and will cease to be included in future versions of semTools. See help(&#39;semTools-deprecated) for details.
-## 
-## It is replaced by the compRelSEM() function, which can estimate alpha and model-based reliability in an even wider variety of models and data types, with greater control in specifying the desired type of reliability coefficient (i.e., more explicitly choosing assumptions). 
-## 
-## The average variance extracted should never have been included because it is not a reliability coefficient. It is now available from the AVE() function.</code></pre>
-<pre><code>## For constructs with categorical indicators, Zumbo et al.`s (2007) &quot;ordinal alpha&quot; is calculated in addition to the standard alpha, which treats ordinal variables as numeric. See Chalmers (2018) for a critique of &quot;alpha.ord&quot; and the response by Zumbo &amp; Kroc (2019). Likewise, average variance extracted is calculated from polychoric (polyserial) not Pearson correlations.</code></pre>
-<pre><code>##                   f
-## alpha     0.8735844
-## alpha.ord 0.9461317
-## omega     0.8737455
-## omega2    0.8737455
-## omega3    0.8739976
-## avevar    0.7456688</code></pre>
+compRelSEM(ajuste_a)</code></pre>
+<pre><code>##     f 
+## 0.869</code></pre>
+<pre class="r"><code>compRelSEM(ajuste_b)</code></pre>
+<pre><code>##     f 
+## 0.874</code></pre>
 <hr />
 </div>
 <div id="comparación-de-clasificación-con-corte-de-3-privaciones" class="section level3">
@@ -545,7 +521,7 @@ ggplot(coef_plot, aes(x = predictor, y = estimate, color = modelo)) +
 intervalos confirma que las escalas construidas con indicadores
 estadísticamente equivalentes producen estimaciones equivalentes. Esto
 ilustra el principio de <strong>invariancia estadística bajo
-intercambiabilidad</strong> en modelos reflectivos.</p>
+intercambiabilidad</strong> en modelos reflexivos.</p>
 <hr />
 </div>
 <div id="conclusión" class="section level3">

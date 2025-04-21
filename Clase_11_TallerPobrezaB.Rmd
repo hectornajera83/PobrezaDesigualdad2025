@@ -64,8 +64,8 @@ modelo_b <- 'f =~ item1 + item2 + item3 + item10 + item11 + item12'
 ajuste_b <- cfa(modelo_b, data = items_full, ordered = c("item1", "item2", "item3", "item10", "item11", "item12"), estimator = "WLSMV")
 
 # Confiabilidades
-reliability(ajuste_a)
-reliability(ajuste_b)
+compRelSEM(ajuste_a)
+compRelSEM(ajuste_b)
 ```
 
 ---
@@ -142,9 +142,7 @@ ggplot(coef_plot, aes(x = predictor, y = estimate, color = modelo)) +
 
 ### Interpretación
 
-La **superposición casi exacta** de los coeficientes e intervalos confirma que las escalas construidas con indicadores estadísticamente equivalentes producen estimaciones equivalentes. Esto ilustra el principio de **invariancia estadística bajo intercambiabilidad** en modelos reflectivos.
-
-
+La **superposición casi exacta** de los coeficientes e intervalos confirma que las escalas construidas con indicadores estadísticamente equivalentes producen estimaciones equivalentes. Esto ilustra el principio de **invariancia estadística bajo intercambiabilidad** en modelos reflexivos.
 
 ---
 
