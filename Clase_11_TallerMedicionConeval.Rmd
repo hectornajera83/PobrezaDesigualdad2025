@@ -1,0 +1,67 @@
+---
+title: "Taller_11_MedicionConeval"
+author: "Hector Najera"
+date: "2025-04-21"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(haven)
+library(lavaan)
+library(semTools)
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+D<-read_dta("pobreza_22.dta")
+D %>% filter(!is.na(pobreza)) -> D
+```
+
+# Estimación del modelo con SEM 
+
+```{r}
+modelo <- '
+  factor_latente =~ ic_segsoc + ic_cv + ic_asalud + ic_sbv + ic_rezedu + ic_ali_nc
+  factor_latente ~~ 1*factor_latente 
+'
+
+ajuste <- cfa(modelo, 
+              data = D,               
+              ordered = c("ic_segsoc", "ic_cv", "ic_asalud", "ic_sbv", "ic_rezedu", "ic_ali_nc"),
+              sampling.weights = "factor", 
+              estimator = "WLSMV")
+
+summary(ajuste, fit.measures = TRUE, standardized = TRUE)
+```
+
+Graficamos los $R^2$ con `ggplot2`
+
+```{r}
+library(tibble)
+
+r2_vals <- inspect(ajuste, "r2")
+
+
+r2_plot <- enframe(r2_vals, name = "Variable", value = "R2")
+
+ggplot(r2_plot, aes(x = reorder(Variable, R2), y = R2)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = round(R2, 2)), vjust = -0.5) +
+  labs(title = "R² por indicador",
+       x = "Indicador",
+       y = expression(R^2)) +
+  ylim(0, 1) +
+  theme_minimal()
+```
+
+Estimamos $\omega$ con `semTools`. Observamos que el valor de omega es muy bajo. 
+
+```{r}
+compRelSEM(ajuste)
+```
+
+
+
