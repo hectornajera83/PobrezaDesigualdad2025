@@ -9,9 +9,9 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Tu Nombre" />
+<meta name="author" content="Héctor Nájera" />
 
-<meta name="date" content="2025-04-13" />
+<meta name="date" content="2025-04-20" />
 
 <title>Ejemplo: Medición Confiable con Indicadores Binarios</title>
 
@@ -352,16 +352,22 @@ display: none;
 
 <h1 class="title toc-ignore">Ejemplo: Medición Confiable con Indicadores
 Binarios</h1>
-<h4 class="author">Tu Nombre</h4>
-<h4 class="date">2025-04-13</h4>
+<h4 class="author">Héctor Nájera</h4>
+<h4 class="date">2025-04-20</h4>
 
 </div>
 
 
 <div id="simulación-de-indicadores-binarios-con-alta-confiabilidad" class="section level2">
 <h2>1. Simulación de Indicadores Binarios con Alta Confiabilidad</h2>
-<p>Simulamos una variable latente (por ejemplo, pobreza) y seis
-indicadores binarios con una relación muy fuerte con esta.</p>
+<p>Lo primero que haremos es mostrar lo que ocurre, desde el punto de
+vista de la teoría estadística, cuando tenemos una medición de pobreza
+con bajo error aleatorio. Para ello simularemos un índice de variable
+binarias con bajo error de medición.</p>
+<p>Simulamos una variable latente (pobreza) y seis indicadores binarios
+con una relación muy fuerte con esta, i.e., la mayor parte de la
+variabilidad de los indicadores se explica por cambios en la variable
+latente.</p>
 <pre class="r"><code>set.seed(123)
 N &lt;- 2000
 eta &lt;- rnorm(N)  # variable latente
@@ -389,14 +395,71 @@ colnames(items) &lt;- paste0(&quot;item&quot;, 1:6)</code></pre>
 </div>
 <div id="modelo-de-medición-cfa-con-variables-categóricas" class="section level2">
 <h2>2. Modelo de Medición: CFA con Variables Categóricas</h2>
+<p>A continuación estimaremos un modelo de análisis factorial
+confirmatorio (AFC o CFA en inglés). Estos modelos permiten estimar la
+cantidad de señal atribuible a una variable latente. En el extremo,
+cuando la variabilidad de un ítem es totalmente atribuible a la variable
+de interés, lo que esperaríamos es que la proporción de la varianza
+explicada sea 100%. Un ejemplo de este comportamiento sería un
+termómetro bien calibrado o un reloj atómico.</p>
+<p>En este bloque ajustamos un <strong>modelo de análisis factorial
+confirmatorio (CFA)</strong> con 6 indicadores binarios usando el
+paquete <code>lavaan</code>.</p>
+<ul>
+<li><p><code>factor</code> es la <strong>variable latente no
+observada</strong> (por ejemplo: pobreza).</p></li>
+<li><p><code>=~</code> se lee como: <strong>“es medido
+por”</strong>.</p></li>
+<li><p><code>item1 + item2 + ...</code> son los <strong>ítems
+observados</strong> del cuestionario.</p></li>
+<li><p>En resumen: estamos diciendo que esos 6 ítems reflejan el mismo
+constructo latente.</p></li>
+<li><p><code>modelo</code>: el modelo de medición que definimos
+antes.</p></li>
+<li><p><code>data = items</code>: usamos la base de datos que contiene
+los ítems.</p></li>
+<li><p><code>ordered = names(items)</code>: le indicamos a lavaan que
+todos los ítems son variables <strong>categóricas</strong> (por ejemplo,
+0 = no, 1 = sí).</p></li>
+<li><p><code>estimator = &quot;WLSMV&quot;</code>: es el estimador robusto
+recomendado para variables ordinales o binarios. Ajusta mejor los
+errores y los valores de ajuste cuando no hay normalidad.</p></li>
+<li><p>Valida si las preguntas realmente miden <strong>un solo
+constructo común</strong>.</p></li>
+<li><p>Permite estimar un <strong>puntaje compuesto más
+confiable</strong> que la suma simple.</p></li>
+<li><p>Es la base para modelos más complejos: medición por grupos,
+longitudinal, estructural (SEM).</p></li>
+</ul>
 <pre class="r"><code>modelo &lt;- &#39;
   factor =~ item1 + item2 + item3 + item4 + item5 + item6
 &#39;
 
 ajuste &lt;- cfa(modelo, data = items, ordered = names(items), estimator = &quot;WLSMV&quot;)</code></pre>
 </div>
-<div id="coeficiente-de-determinación-r²" class="section level2">
-<h2>3. Coeficiente de Determinación R²</h2>
+<div id="coeficiente-de-determinación-r2" class="section level2">
+<h2>3. Coeficiente de Determinación <span class="math inline">\(R^2\)</span></h2>
+<p>Una vez ajustado el modelo CFA, podemos calcular el
+<strong>coeficiente de determinación <span class="math inline">\(R^2\)</span></strong> para cada ítem. Este valor
+indica <strong>qué proporción de la varianza del ítem es explicada por
+el factor latente</strong>.</p>
+<ul>
+<li><code>inspect(ajuste, &quot;r2&quot;)</code> obtiene un vector con los valores
+<span class="math inline">\(R^2\)</span> para cada ítem del modelo.</li>
+<li>Estos valores nos dicen <strong>qué tan bien el factor latente
+predice cada ítem</strong>.
+<ul>
+<li>Un <span class="math inline">\(R^2\)</span> cercano a 1 indica una
+relación fuerte (alta varianza explicada),</li>
+<li>Un <span class="math inline">\(R^2\)</span> cercano a 0 indica una
+relación débil (el ítem no es bien explicado por el factor).</li>
+</ul></li>
+<li>Si todos los <span class="math inline">\(R^2\)</span> son altos
+(&gt; 0.5), el modelo tiene buena confiabilidad, i.e., bajo error
+aleatorio.</li>
+<li>Si uno o más son bajos (&lt; 0.3), puede ser señal de un ítem débil
+o con poco poder explicativo.</li>
+</ul>
 <pre class="r"><code>r2 &lt;- inspect(ajuste, &quot;r2&quot;)
 r2_df &lt;- data.frame(item = names(r2), R2 = as.numeric(r2))
 
@@ -411,6 +474,36 @@ ggplot(r2_df, aes(x = reorder(item, R2), y = R2)) +
 </div>
 <div id="evaluación-global-del-modelo" class="section level2">
 <h2>4. Evaluación Global del Modelo</h2>
+<p>Una vez que ajustamos un modelo CFA, es importante evaluar
+<strong>qué tan bien se ajusta el modelo a los datos
+observados</strong>. Para ello usamos distintos <strong>índices de
+ajuste global</strong>, especialmente los que son
+<strong>robustos</strong>.</p>
+<ul>
+<li><strong>CFI.robust (Comparative Fit Index):</strong>
+<ul>
+<li>Compara el modelo estimado con un modelo nulo (sin relaciones).</li>
+<li>Valores &gt; 0.95 indican excelente ajuste.</li>
+</ul></li>
+<li><strong>TLI.robust (Tucker–Lewis Index):</strong>
+<ul>
+<li>Similar al CFI pero penaliza modelos más complejos.</li>
+<li>Valores &gt; 0.95 indican muy buen ajuste.</li>
+</ul></li>
+<li><strong>RMSEA.robust (Root Mean Square Error of
+Approximation):</strong>
+<ul>
+<li>Estima el error de aproximación del modelo a la realidad.</li>
+<li>Valores &lt; 0.05 indican ajuste excelente, &lt; 0.08
+aceptable.</li>
+</ul></li>
+<li><strong>rmsea.ci.lower.robust / rmsea.ci.upper.robust:</strong>
+<ul>
+<li>Límite inferior y superior del intervalo de confianza al 90% del
+RMSEA.</li>
+<li>Idealmente, el límite superior debería ser &lt; 0.08.</li>
+</ul></li>
+</ul>
 <pre class="r"><code>fitMeasures(ajuste, c(&quot;cfi.robust&quot;, &quot;tli.robust&quot;, 
                       &quot;rmsea.robust&quot;, 
                       &quot;rmsea.ci.lower.robust&quot;, &quot;rmsea.ci.upper.robust&quot;))</code></pre>
@@ -423,6 +516,30 @@ ggplot(r2_df, aes(x = reorder(item, R2), y = R2)) +
 </div>
 <div id="comparación-puntaje-simple-vs.-puntaje-latente" class="section level2">
 <h2>5. Comparación: Puntaje Simple vs. Puntaje Latente</h2>
+<p>En esta sección comparamos dos formas de construir un puntaje para
+medir un constructo latente:</p>
+<ol style="list-style-type: decimal">
+<li><strong>Suma simple</strong>: sumar los valores binarios (0/1) de
+los ítems.</li>
+<li><strong>Puntaje latente</strong>: estimado a partir del modelo
+factorial confirmatorio (<code>CFA</code>) mediante
+<code>lavPredict()</code></li>
+</ol>
+<ul>
+<li>Permite evaluar <strong>cuán similar es el índice crudo a la
+medición basada en modelo</strong>.</li>
+<li>Si la <strong>correlación es alta</strong> (por ejemplo, &gt; 0.9),
+la suma simple puede ser una <strong>buena aproximación</strong> al
+puntaje latente.</li>
+<li>Si la <strong>correlación es baja o hay no linealidad</strong>, la
+suma simple puede ser <strong>una mala medida del constructo</strong>,
+especialmente si los ítems tienen:
+<ul>
+<li>Diferente calidad (cargas),</li>
+<li>Poca varianza,</li>
+<li>O no siguen un modelo unidimensional.</li>
+</ul></li>
+</ul>
 <pre class="r"><code>puntajes &lt;- lavPredict(ajuste, method = &quot;regression&quot;)
 
 datos &lt;- items %&gt;%
@@ -442,6 +559,36 @@ ggplot(datos, aes(x = suma_simple, y = puntaje_latente)) +
 </div>
 <div id="confiabilidad-coeficiente-omega" class="section level2">
 <h2>6. Confiabilidad: Coeficiente Omega</h2>
+<p>Además del alfa de Cronbach, una medida más robusta de confiabilidad
+en modelos de medición es el <strong>coeficiente omega</strong> (también
+llamado <strong>omega total</strong>). A diferencia de alfa, omega:</p>
+<ul>
+<li><strong>No asume que todos los ítems contribuyen igual</strong> al
+constructo,</li>
+<li><strong>Toma en cuenta las cargas factoriales estimadas</strong> en
+un modelo CFA,</li>
+<li>Es más adecuado cuando los ítems tienen <strong>distintas
+precisiones</strong>.</li>
+</ul>
+<p>La función <code>compRelSEM()</code> del paquete
+<code>semTools</code> permite estimar el <strong>omega total</strong>
+directamente desde un modelo CFA:</p>
+<p>Supongamos un modelo de un solo factor con:</p>
+<ul>
+<li><span class="math inline">\(\lambda_i\)</span>: carga factorial del
+ítem <em>i</em>,</li>
+<li><span class="math inline">\(\theta_i\)</span>: varianza del error
+del ítem <em>i</em>.</li>
+</ul>
+<p>Entonces el <strong>omega total</strong> se calcula como:</p>
+<p><span class="math display">\[
+\omega = \frac{\left(\sum_{i=1}^{k}
+\lambda_i\right)^2}{\left(\sum_{i=1}^{k} \lambda_i\right)^2 +
+\sum_{i=1}^{k} \theta_i}
+\]</span></p>
+<p>Donde: - El numerador representa la <strong>varianza explicada por el
+factor común</strong>, - El denominador incluye tanto la varianza
+explicada como la <strong>varianza de error</strong>.</p>
 <pre class="r"><code>compRelSEM(ajuste)</code></pre>
 <pre><code>## factor 
 ##  0.905</code></pre>
